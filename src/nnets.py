@@ -3,7 +3,6 @@ from typing import List, Optional, Sequence, Tuple
 
 import torch
 import torch.nn as nn 
-from torchsummary import summary
 
 class PositiveLinear(nn.Module):
     def __init__(self, input_dimension: int, output_dimension: int):
@@ -91,19 +90,19 @@ class PartiallyConvexLayer(nn.Module):
         # nonconvex signal path 
         self.nonconvex_output_dimension, self.nonconvex_input_dimension = nonconvex_dimensions
         self.nonconvex_weights = nn.Parameter(torch.Tensor(*nonconvex_dimensions))
-        self.nonconvex_bias = nn.Parameter(torch.Tensor(self.nonconvex_output_dimension))
+        self.nonconvex_bias = nn.Parameter(torch.zeros(self.nonconvex_output_dimension))
 
         # convex signal path 
         self.skip_dimension = convex_skip_dimension
         self.convex_output_dimension, self.convex_input_dimension = convex_dimensions
         self.log_weights = nn.Parameter(torch.Tensor(*convex_dimensions)) # W^{(z)}
         self.nonconvex_to_latent_weights = nn.Parameter(torch.Tensor(self.convex_input_dimension, self.nonconvex_output_dimension)) # W^{(zu)}
-        self.convex_inner_bias = nn.Parameter(torch.Tensor(self.convex_input_dimension)) # b^{(z)}
+        self.convex_inner_bias = nn.Parameter(torch.zeros(self.convex_input_dimension)) # b^{(z)}
         self.convex_weights = nn.Parameter(torch.Tensor(self.convex_output_dimension, convex_skip_dimension)) # W^{(y)}
         self.nonconvex_to_convex_weights = nn.Parameter(torch.Tensor(convex_skip_dimension, self.nonconvex_output_dimension)) # W^{(yu)}
-        self.skip_bias = nn.Parameter(torch.Tensor(convex_skip_dimension)) # b^{(y)}
+        self.skip_bias = nn.Parameter(torch.zeros(convex_skip_dimension)) # b^{(y)}
         self.nonconvex_latent_weights = nn.Parameter(torch.Tensor(self.convex_output_dimension, self.nonconvex_output_dimension)) # W^{(u)}
-        self.convex_outer_bias = nn.Parameter(torch.Tensor(self.convex_output_dimension)) # b
+        self.convex_outer_bias = nn.Parameter(torch.zeros(self.convex_output_dimension)) # b
         self.reset_parameters()
 
     def __repr__(self) -> str: 
@@ -114,12 +113,14 @@ class PartiallyConvexLayer(nn.Module):
             if parameter.dim() > 1: 
                 nn.init.xavier_uniform(parameter)
 
-    def forward(self, nonconvex_inputs: torch.Tensor, latent: torch.Tensor, convex_inputs: torch.Tensor) -> Tuple[torch.Tensor]: 
+
+    def forward(self, nonconvex_inputs: torch.Tensor, latent: torch.Tensor, convex_inputs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]: 
         u: torch.Tensor = self.nonconvex_activation(self.nonconvex_weights @ nonconvex_inputs + self.nonconvex_bias) 
         z: torch.Tensor = self.log_weights.exp() @ (latent * nn.functional.relu(self.nonconvex_to_latent_weights @ u + self.convex_inner_bias)) + \
                             self.convex_weights @ (convex_inputs * (self.nonconvex_to_convex_weights @ u + self.skip_bias)) + \
                             self.nonconvex_latent_weights @ u + self.convex_outer_bias
         return u, z 
+
 
 class PartiallyConvexNet(nn.Module): 
     def __init__(self, config: PartiallyConvexNetConfig): 
@@ -131,7 +132,8 @@ class PartiallyConvexNet(nn.Module):
         self.nonconvex_layer_spec = list(zip(self.config.nonconvex_layer_sizes[1:], self.config.nonconvex_layer_sizes[:-1]))
         self.config.convex_layer_sizes.insert(0, self.config.nonconvex_layer_sizes[0])
         self.convex_layer_spec = list(zip(self.config.convex_layer_sizes[1:], self.config.convex_layer_sizes[:-1]))
-        self.layers = [PartiallyConvexLayer(convex_dimensions, nonconvex_dimensions, self.config.convex_input_size) for convex_dimensions, nonconvex_dimensions in zip(self.convex_layer_spec, self.nonconvex_layer_spec)]
+        self.layers = nn.ModuleList([PartiallyConvexLayer(convex_dimensions, nonconvex_dimensions, self.config.convex_input_size) for convex_dimensions, nonconvex_dimensions in zip(self.convex_layer_spec, self.nonconvex_layer_spec)])
+
 
     def forward(self, nonconvex_inputs: torch.Tensor, convex_inputs: torch.Tensor) -> torch.Tensor: 
         u: torch.Tensor = nonconvex_inputs
