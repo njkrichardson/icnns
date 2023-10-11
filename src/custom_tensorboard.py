@@ -330,3 +330,11 @@ def markdownify_operative_config_str(string):
             output_lines.append(procd_line)
 
     return '\n'.join(output_lines)
+
+def image_from_figure(figure, dpi: int=128) -> np.ndarray: 
+    io_buf = io.BytesIO()
+    figure.savefig(io_buf, format='raw', dpi=dpi)
+    io_buf.seek(0)
+    img_arr = np.reshape(np.frombuffer(io_buf.getvalue(), dtype=np.uint8), newshape=(int(figure.bbox.bounds[3]), int(figure.bbox.bounds[2]), -1))
+    io_buf.close()
+    return img_arr
