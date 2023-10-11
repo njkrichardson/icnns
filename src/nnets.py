@@ -145,14 +145,3 @@ class PartiallyConvexNet(nn.Module):
         if self.config.activate_last: 
             z = self.config.convex_activation(z)
         return z 
-
-convex_layer_sizes = [5, 6, 2] 
-nonconvex_layer_sizes = [3, 5, 6, 2]
-convex_input_size = 1 
-config = PartiallyConvexNetConfig(convex_layer_sizes, nonconvex_layer_sizes, convex_input_size)
-net = PartiallyConvexNet(config)
-nonconvex_input = torch.ones(3) 
-convex_input = torch.ones(1) 
-out = net(nonconvex_input, convex_input)
-breakpoint()
-dummy: int = 5 
