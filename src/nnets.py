@@ -16,7 +16,7 @@ class PositiveLinear(nn.Module):
         nn.init.xavier_uniform_(self.log_weights)
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
-        return nn.functional.linear(input, self.log_weights.exp())
+        return nn.functional.linear(input, torch.exp(self.log_weights))
 
 class InputConvexLayer(nn.Module): 
     def __init__(self, input_dimension: int, output_dimension: int): 
@@ -116,7 +116,7 @@ class PartiallyConvexLayer(nn.Module):
 
     def forward(self, nonconvex_inputs: torch.Tensor, latent: torch.Tensor, convex_inputs: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]: 
         u: torch.Tensor = self.nonconvex_activation(self.nonconvex_weights @ nonconvex_inputs + self.nonconvex_bias) 
-        z: torch.Tensor = self.log_weights.exp() @ (latent * nn.functional.relu(self.nonconvex_to_latent_weights @ u + self.convex_inner_bias)) + \
+        z: torch.Tensor = torch.exp(self.log_weights) @ (latent * nn.functional.relu(self.nonconvex_to_latent_weights @ u + self.convex_inner_bias)) + \
                             self.convex_weights @ (convex_inputs * (self.nonconvex_to_convex_weights @ u + self.skip_bias)) + \
                             self.nonconvex_latent_weights @ u + self.convex_outer_bias
         return u, z 

@@ -247,7 +247,7 @@ class SummaryWriter:
         values = np.reshape(values, -1)
         counts, limits = np.histogram(values, bins=bins)
         # boundary logic
-        cum_counts = np.cumsum(np.greater(counts, 0, dtype=np.int32))
+        cum_counts = np.cumsum(np.greater(counts, 0))
         start, end = np.searchsorted(
             cum_counts, [0, cum_counts[-1] - 1], side='right')
         start, end = int(start), int(end) + 1
